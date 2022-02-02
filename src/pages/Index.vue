@@ -1,19 +1,37 @@
 <template>
   <q-page class="flex flex-center">
-    <div class="q-pa-md">
-    <q-table
-      title="Treats"
-      :rows="rows"
-      :columns="columns"
-      row-key="name"
-    />
-  </div>
+    <q-form @submit.prevent="onSubmit" class="q-gutter-md">
+      <div class="q-pa-md">
+        <q-table
+          title="Treats"
+          :rows="rows"
+          :columns="columns"
+          row-key="name"
+        />
+      </div>
+      <q-input
+        @update:model-value="val => { file = val[0] }"
+        filled
+        name="inputImg"
+        id="inputImg"
+        type="file"
+        hint="Native file"
+      />
+      <div>
+        <q-btn label="Submit" type="submit" color="primary"/>
+      </div>
+    </q-form>
   </q-page>
 </template>
 
 <script>
 
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
+import axios from 'axios'
+// const ENDPOINT_PATH = process.env.BACKEND_V2_URL
+// const ENDPOINT_PATH = 'https://ejdevelop.com/bloque7_backend/'
+const ENDPOINT_PATH = 'http://localhost:4001/'
+
 const columns = [
   {
     name: 'name',
@@ -139,9 +157,28 @@ const rows = [
 export default defineComponent({
   name: 'PageIndex',
   setup () {
+    const urlupload = ref(ENDPOINT_PATH + 'upload')
+    const idproducto = ref('id123456')
     return {
       columns,
-      rows
+      rows,
+      urlupload,
+      idproducto
+    }
+  },
+  methods: {
+    async onSubmit (evt) {
+      const formData = new FormData(evt.target)
+      formData.append('nombreimagen', this.idproducto)
+      await axios.post(this.urlupload, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(function (response) {
+        console.log(response.data)
+      }).catch(function (error) {
+        console.log('error:> ', error)
+      })
     }
   }
 })
