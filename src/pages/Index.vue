@@ -1,26 +1,71 @@
 <template>
   <q-page class="flex flex-center">
-    <q-form @submit.prevent="onSubmit" class="q-gutter-md">
       <div class="q-pa-md">
         <q-table
-          title="Treats"
-          :rows="rows"
+          title="Productos"
+          :rows="serverData"
           :columns="columns"
           row-key="name"
-        />
+          @request="getProductos"
+        >
+          <template v-slot:body="props">
+            <q-tr :props="props">
+              <q-td>
+                {{ props.row.id }}
+              </q-td>
+              <q-td>
+                {{ props.row.nombre }}
+              </q-td>
+              <q-td>
+                {{ props.row.precio.toFixed(2) }}
+              </q-td>
+              <q-td>
+                {{ props.row.categoria }}
+              </q-td>
+              <q-td>
+                {{ props.row.disponible }}
+              </q-td>
+              <q-td @click="openEdit(props.row.id)">
+                <img v-if="props.row.imagen" v-bind:src="props.row.imagen" width="100"/>
+                <img v-else src="../assets/default.svg" width="100">
+              </q-td>
+            </q-tr>
+          </template>
+        </q-table>
       </div>
-      <q-input
-        @update:model-value="val => { file = val[0] }"
-        filled
-        name="inputImg"
-        id="inputImg"
-        type="file"
-        hint="Native file"
-      />
-      <div>
-        <q-btn label="Submit" type="submit" color="primary"/>
-      </div>
-    </q-form>
+      <q-dialog v-model="layoutModalimg" persistent>
+      <q-card class="my-card" flat bordered style="width: 100%;">
+        <q-card-section style="display: flex;height: 350px; justify-content: center; align-items: center;height: 350px;text-align: center;">
+          <q-spinner
+            color="primary"
+            size="3em"
+            v-if="loaderimg"
+          />
+          <img v-if="noimg" src="../assets/default.svg" style="height: 50%;">
+        </q-card-section>
+        <q-card-section>
+          <q-form @submit.prevent="onSubmit" class="q-gutter-md">
+            <q-input
+                name="inputId"
+                id="inputId"
+                type="hidden"
+                v-model="idproductoUpd"
+            />
+            <q-input
+                @update:model-value="val => { file = val[0] }"
+                filled
+                name="inputImg"
+                id="inputImg"
+                type="file"
+            />
+            <div>
+                <q-btn label="Enviar" type="submit" color="primary" style="margin: 20px;"/>
+                <q-btn label="Cerrar" type="button" color="secondary" v-close-popup style="margin: 20px;"/>
+            </div>
+          </q-form>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -33,153 +78,104 @@ import axios from 'axios'
 const ENDPOINT_PATH = 'http://localhost:4001/'
 
 const columns = [
+  { name: 'id', align: 'center', label: 'ID', field: 'id', sortable: true },
   {
-    name: 'name',
+    name: 'nombre',
     required: true,
-    label: 'Dessert (100g serving)',
+    label: 'Nombre',
     align: 'left',
-    field: row => row.name,
+    field: row => row.nombre,
     format: val => `${val}`,
     sortable: true
   },
-  { name: 'calories', align: 'center', label: 'Calories', field: 'calories', sortable: true },
-  { name: 'fat', label: 'Fat (g)', field: 'fat', sortable: true },
-  { name: 'carbs', label: 'Carbs (g)', field: 'carbs' },
-  { name: 'protein', label: 'Protein (g)', field: 'protein' },
-  { name: 'sodium', label: 'Sodium (mg)', field: 'sodium' },
-  { name: 'calcium', label: 'Calcium (%)', field: 'calcium', sortable: true, sort: (a, b) => parseInt(a, 10) - parseInt(b, 10) },
-  { name: 'iron', label: 'Iron (%)', field: 'iron', sortable: true, sort: (a, b) => parseInt(a, 10) - parseInt(b, 10) }
-]
-
-const rows = [
-  {
-    name: 'Frozen Yogurt',
-    calories: 159,
-    fat: 6.0,
-    carbs: 24,
-    protein: 4.0,
-    sodium: 87,
-    calcium: '14%',
-    iron: '1%'
-  },
-  {
-    name: 'Ice cream sandwich',
-    calories: 237,
-    fat: 9.0,
-    carbs: 37,
-    protein: 4.3,
-    sodium: 129,
-    calcium: '8%',
-    iron: '1%'
-  },
-  {
-    name: 'Eclair',
-    calories: 262,
-    fat: 16.0,
-    carbs: 23,
-    protein: 6.0,
-    sodium: 337,
-    calcium: '6%',
-    iron: '7%'
-  },
-  {
-    name: 'Cupcake',
-    calories: 305,
-    fat: 3.7,
-    carbs: 67,
-    protein: 4.3,
-    sodium: 413,
-    calcium: '3%',
-    iron: '8%'
-  },
-  {
-    name: 'Gingerbread',
-    calories: 356,
-    fat: 16.0,
-    carbs: 49,
-    protein: 3.9,
-    sodium: 327,
-    calcium: '7%',
-    iron: '16%'
-  },
-  {
-    name: 'Jelly bean',
-    calories: 375,
-    fat: 0.0,
-    carbs: 94,
-    protein: 0.0,
-    sodium: 50,
-    calcium: '0%',
-    iron: '0%'
-  },
-  {
-    name: 'Lollipop',
-    calories: 392,
-    fat: 0.2,
-    carbs: 98,
-    protein: 0,
-    sodium: 38,
-    calcium: '0%',
-    iron: '2%'
-  },
-  {
-    name: 'Honeycomb',
-    calories: 408,
-    fat: 3.2,
-    carbs: 87,
-    protein: 6.5,
-    sodium: 562,
-    calcium: '0%',
-    iron: '45%'
-  },
-  {
-    name: 'Donut',
-    calories: 452,
-    fat: 25.0,
-    carbs: 51,
-    protein: 4.9,
-    sodium: 326,
-    calcium: '2%',
-    iron: '22%'
-  },
-  {
-    name: 'KitKat',
-    calories: 518,
-    fat: 26.0,
-    carbs: 65,
-    protein: 7,
-    sodium: 54,
-    calcium: '12%',
-    iron: '6%'
-  }
+  { name: 'precio', align: 'center', label: 'Precio', field: 'precio', sortable: true },
+  { name: 'categoria', label: 'Categoria', field: 'categoria', sortable: true },
+  { name: 'disponible', label: 'Disponible', field: 'disponible' },
+  { name: 'imagen', label: 'Imagen', field: 'imagen', sortable: true }
 ]
 
 export default defineComponent({
   name: 'PageIndex',
+  data () {
+    return {
+      serverData: []
+    }
+  },
   setup () {
     const urlupload = ref(ENDPOINT_PATH + 'upload')
-    const idproducto = ref('id123456')
+    const idproductoUpd = ref(false)
+    const layoutModalimg = ref(false)
+    const loaderimg = ref(false)
+    const noimg = ref(true)
     return {
       columns,
-      rows,
+      loaderimg,
+      noimg,
+      layoutModalimg,
       urlupload,
-      idproducto
+      idproductoUpd
     }
   },
   methods: {
+    openEdit (id) {
+      this.layoutModalimg = true
+      this.idproductoUpd = id
+      console.log(this.idproductoUpd)
+    },
     async onSubmit (evt) {
       const formData = new FormData(evt.target)
-      formData.append('nombreimagen', this.idproducto)
+      console.log(this.idproductoUpd)
+      formData.append('nombreimagen', this.idproductoUpd)
       await axios.post(this.urlupload, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       }).then(function (response) {
         console.log(response.data)
+        // this.getProductos()
       }).catch(function (error) {
         console.log('error:> ', error)
       })
+      // await this.getProductos()
+      this.$router.go(0)
+      this.layoutModalimg = false
+    },
+    async getProductos () {
+      const data = { categoria: null }
+      const resp = await axios.post(ENDPOINT_PATH + 'listarproductos', data)
+      this.serverData = []
+      const datos = resp.data
+      console.log(datos)
+      for (const i in datos) {
+        const item = datos[i]
+        const obj = {}
+        obj.id = item.id
+        obj.nombre = item.nombre
+        obj.precio =
+          item.porkilos === 1
+            ? item.precio
+            : parseFloat(item.precio / item.unixcaja)
+        obj.disponible = item.disponible
+        obj.categoria = item.idcategoria
+        let img = null
+        // console.log(ENDPOINT_PATH + 'files/' + item.id + '.png')
+        if (this.fileExists(ENDPOINT_PATH + 'files/' + item.id + '.png')) {
+          img = ENDPOINT_PATH + 'files/' + item.id + '.png'
+        }
+        console.log(img)
+        obj.imagen = img
+        this.serverData.push(obj)
+      }
+    },
+    fileExists (path) {
+      const http = new XMLHttpRequest()
+      http.open('HEAD', path, false)
+      http.send()
+      return http.status !== 404
     }
+  },
+  mounted () {
+    this.getProductos()
   }
 })
 </script>
