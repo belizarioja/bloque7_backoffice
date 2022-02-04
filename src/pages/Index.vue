@@ -5,9 +5,18 @@
           title="Productos"
           :rows="serverData"
           :columns="columns"
-          row-key="name"
-          @request="getProductos"
+          row-key="id"
+          :key="tableKey"
+          :pagination="initialPagination"
+          :filter="filter"
         >
+          <template v-slot:top-right>
+            <q-input borderless dense debounce="300" v-model="filter" placeholder="Search">
+              <template v-slot:append>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </template>
           <template v-slot:body="props">
             <q-tr :props="props">
               <q-td>
@@ -25,24 +34,26 @@
               <q-td>
                 {{ props.row.disponible }}
               </q-td>
-              <q-td @click="openEdit(props.row.id)">
+              <q-td>
                 <img v-if="props.row.imagen" v-bind:src="props.row.imagen" width="100"/>
                 <img v-else src="../assets/default.svg" width="100">
+              </q-td>
+              <q-td>
+                <q-btn v-if="props.row.imagen" @click="onDelete(props.row.id)" label="Eliminar imagen" v-close-popup type="buttom" color="negative" style="margin: 20px;"/>
+                <q-btn v-else @click="openEdit(props.row.id)" label="Agregar imagen" v-close-popup type="buttom" color="primary" style="margin: 20px;"/>
               </q-td>
             </q-tr>
           </template>
         </q-table>
       </div>
+      <!-- <q-dialog v-model="layoutModalimg" persistent>
+        <q-uploader
+        :url="urlupload"
+        style="max-width: 300px"
+      />
+      </q-dialog> -->
       <q-dialog v-model="layoutModalimg" persistent>
       <q-card class="my-card" flat bordered style="width: 100%;">
-        <q-card-section style="display: flex;height: 350px; justify-content: center; align-items: center;height: 350px;text-align: center;">
-          <q-spinner
-            color="primary"
-            size="3em"
-            v-if="loaderimg"
-          />
-          <img v-if="noimg" src="../assets/default.svg" style="height: 50%;">
-        </q-card-section>
         <q-card-section>
           <q-form @submit.prevent="onSubmit" class="q-gutter-md">
             <q-input
@@ -59,7 +70,7 @@
                 type="file"
             />
             <div>
-                <q-btn label="Enviar" type="submit" color="primary" style="margin: 20px;"/>
+                <q-btn label="Guardar imagen" type="submit" color="primary" style="margin: 20px;"/>
                 <q-btn label="Cerrar" type="button" color="secondary" v-close-popup style="margin: 20px;"/>
             </div>
           </q-form>
@@ -73,9 +84,8 @@
 
 import { defineComponent, ref } from 'vue'
 import axios from 'axios'
-// const ENDPOINT_PATH = process.env.BACKEND_V2_URL
-// const ENDPOINT_PATH = 'https://ejdevelop.com/bloque7_backend/'
-const ENDPOINT_PATH = 'http://localhost:4001/'
+const config = require('../config/endpoints.js')
+const ENDPOINT_PATH = config.endpoint_path
 
 const columns = [
   { name: 'id', align: 'center', label: 'ID', field: 'id', sortable: true },
@@ -91,14 +101,17 @@ const columns = [
   { name: 'precio', align: 'center', label: 'Precio', field: 'precio', sortable: true },
   { name: 'categoria', label: 'Categoria', field: 'categoria', sortable: true },
   { name: 'disponible', label: 'Disponible', field: 'disponible' },
-  { name: 'imagen', label: 'Imagen', field: 'imagen', sortable: true }
+  { name: 'imagen', label: 'Imagen', field: 'imagen', align: 'center', sortable: true },
+  { name: 'editar', label: 'Editar', align: 'center' }
 ]
 
 export default defineComponent({
   name: 'PageIndex',
   data () {
     return {
-      serverData: []
+      serverData: [],
+      datos: [],
+      tableKey: 0
     }
   },
   setup () {
@@ -107,7 +120,16 @@ export default defineComponent({
     const layoutModalimg = ref(false)
     const loaderimg = ref(false)
     const noimg = ref(true)
+    const filter = ref('')
     return {
+      filter,
+      initialPagination: {
+        sortBy: 'desc',
+        descending: false,
+        page: 1,
+        rowsPerPage: 50
+        // rowsNumber: xx if getting data from a server
+      },
       columns,
       loaderimg,
       noimg,
@@ -124,7 +146,6 @@ export default defineComponent({
     },
     async onSubmit (evt) {
       const formData = new FormData(evt.target)
-      console.log(this.idproductoUpd)
       formData.append('nombreimagen', this.idproductoUpd)
       await axios.post(this.urlupload, formData, {
         headers: {
@@ -136,16 +157,50 @@ export default defineComponent({
       }).catch(function (error) {
         console.log('error:> ', error)
       })
-      // await this.getProductos()
-      this.$router.go(0)
+      // this.$router.go(0)
       this.layoutModalimg = false
+      this.reloadProducto(this.datos)
+      // await this.getProductos()
+    },
+    async onDelete (id) {
+      console.log(id)
+      this.$q.dialog({
+        title: 'CONFIRMACIÓN!',
+        message: 'Seguro que desea ELIMINAR esta IMAGEN?',
+        ok: {
+          color: 'primary',
+          label: 'Sí'
+        },
+        cancel: {
+          color: 'secondary',
+          label: 'No'
+        },
+        persistent: true
+      }).onOk(async () => {
+        const data = {
+          img: id + '.png'
+        }
+        await axios.post(ENDPOINT_PATH + 'deletefiles', data).then(function (response) {
+          console.log(response.data)
+          // this.getProductos()
+        }).catch(function (error) {
+          console.log('error:> ', error)
+        })
+        // this.$router.go(0)
+        this.reloadProducto(this.datos)
+      })
+      this.layoutModalimg = false
+      // await this.getProductos()
     },
     async getProductos () {
       const data = { categoria: null }
       const resp = await axios.post(ENDPOINT_PATH + 'listarproductos', data)
+      this.datos = resp.data
+      console.log('getProductos')
+      this.reloadProducto(this.datos)
+    },
+    async reloadProducto (datos) {
       this.serverData = []
-      const datos = resp.data
-      console.log(datos)
       for (const i in datos) {
         const item = datos[i]
         const obj = {}
@@ -158,23 +213,17 @@ export default defineComponent({
         obj.disponible = item.disponible
         obj.categoria = item.idcategoria
         let img = null
-        // console.log(ENDPOINT_PATH + 'files/' + item.id + '.png')
-        if (this.fileExists(ENDPOINT_PATH + 'files/' + item.id + '.png')) {
+        const resp = await axios.get(ENDPOINT_PATH + 'files/' + item.id + '.png')
+        if (resp.status === 200) {
           img = ENDPOINT_PATH + 'files/' + item.id + '.png'
         }
-        console.log(img)
         obj.imagen = img
         this.serverData.push(obj)
       }
-    },
-    fileExists (path) {
-      const http = new XMLHttpRequest()
-      http.open('HEAD', path, false)
-      http.send()
-      return http.status !== 404
     }
   },
   mounted () {
+    // this.$emit('edit', this.serverData)
     this.getProductos()
   }
 })
